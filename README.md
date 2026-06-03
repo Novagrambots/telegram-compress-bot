@@ -1,4 +1,4 @@
-# bot_4_compress — Telegram-бот для сжатия видео и фотографий
+# telegram-compress-bot — Telegram-бот для сжатия видео и фотографий
 
 Бот для сжатия медиафайлов через Telegram.
 Aiogram 3 + SQLAlchemy + PostgreSQL + ffmpeg + Pillow + Local Bot API.
