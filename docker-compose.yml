@@ -1,0 +1,71 @@
+services:
+  # Бот
+  bot:
+    build: .
+    restart: unless-stopped
+    labels:
+      - autoheal=true
+    env_file: .env
+    environment:
+      # URL Local Bot API (контейнер bot-api) — файлы до 2 ГБ
+      BOT_API_URL: http://bot-api:8081
+    depends_on:
+      postgres:
+        condition: service_healthy
+      bot-api:
+        condition: service_healthy
+    volumes:
+      # tmp для обрабатываемых файлов
+      - /tmp/compress_bot:/tmp/compress_bot
+      # доступ к файлам Local Bot API
+      - bot-api-data:/var/lib/telegram-bot-api
+
+  # Local Bot API — файлы до 2 ГБ без ограничений
+  bot-api:
+    image: aiogram/telegram-bot-api:latest
+    restart: unless-stopped
+    environment:
+      TELEGRAM_API_ID: ${API_ID}
+      TELEGRAM_API_HASH: ${API_HASH}
+      TELEGRAM_LOCAL: 1
+    ports:
+      - "${BOT_API_PORT:-8085}:8081"
+    volumes:
+      - bot-api-data:/var/lib/telegram-bot-api
+      - /tmp/compress_bot:/tmp/compress_bot
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8081 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  # Автоперезапуск unhealthy контейнеров
+  autoheal:
+    image: willfarrell/autoheal:latest
+    restart: unless-stopped
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: autoheal
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  # PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-bot_4_compress}
+      POSTGRES_USER: ${DB_USER:-bot_4_compress}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-bot_4_compress} -d ${DB_NAME:-bot_4_compress}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+volumes:
+  postgres-data:
+  bot-api-data:
